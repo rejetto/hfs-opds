@@ -5,9 +5,8 @@ Requires **HFS 3.3.0 or newer**. No runtime dependencies or database.
 
 ## Installation
 
-Once published, install through **HFS Admin → Plugins → Get more**: search for **opds** and install it.
+Install through **HFS Admin → Plugins → Get more**: search for **opds** and install it.
 Return to the installed plugins list and click the **Options button on the opds plugin's row** to configure it.
-This repository has not been published yet; for local development use the symlink below.
 
 Enabling the plugin enables its OPDS service. Its Options can disable the service separately, choose book extensions,
 set the page size (100 by default, maximum 1000), and override the catalog title.
