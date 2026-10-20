@@ -21,6 +21,8 @@ const MIME = {
     cbz: 'application/vnd.comicbook+zip', cbr: 'application/vnd.comicbook-rar'
 }
 const ATOM = 'application/atom+xml;profile=opds-catalog'
+// kind is advisory; uninspected folder links suggest navigation without scanning their contents
+const NAVIGATION = ATOM + ';kind=navigation'
 const EPOCH = '1970-01-01T00:00:00.000Z'
 
 exports.init = async api => {
@@ -63,7 +65,7 @@ exports.init = async api => {
         const view = ctx.query.opds_view || ''
         if (view && view !== 'books') return fail(400, "Invalid view")
         const node = await urlToNode(ctx.path, ctx)
-        if (!node || !hasPermission(node, 'can_see', ctx)) return fail(404, "Not found")
+        if (!node) return fail(404, "Not found")
         if (!nodeIsFolder(node)) return fail(404, "Not a folder")
         const denied = statusCodeForMissingPerm(node, 'can_list', ctx)
         if (denied) {
@@ -92,6 +94,7 @@ exports.init = async api => {
         }
         const navigation = !view && folders.length > 0
         const kind = navigation ? 'navigation' : 'acquisition'
+        const mainType = folders.length ? NAVIGATION : ATOM + ';kind=acquisition'
         const items = navigation ? folders : books
         // sort independently of disk/cache enumeration so page boundaries remain stable between requests
         items.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
@@ -105,9 +108,9 @@ exports.init = async api => {
             + element('id', stableId(vfsPath + (view ? '?books' : '?catalog')))
             + element('title', title) + element('updated', updated) + '<author><name>HFS</name></author>'
             + link('self', feedUrl(publicPath, view, page), ATOM + ';kind=' + kind)
-            + link('start', feedUrl('/'), ATOM)
-        if (view) xml += link('up', feedUrl(publicPath), ATOM)
-        else if (publicPath !== '/') xml += link('up', feedUrl(publicPath.replace(/[^/]+\/$/, '')), ATOM)
+            + link('start', feedUrl('/'), publicPath === '/' ? mainType : NAVIGATION)
+        if (view) xml += link('up', feedUrl(publicPath), mainType)
+        else if (publicPath !== '/') xml += link('up', feedUrl(publicPath.replace(/[^/]+\/$/, '')), NAVIGATION)
         xml += link('first', feedUrl(publicPath, view, 1), ATOM + ';kind=' + kind)
             + link('last', feedUrl(publicPath, view, pages), ATOM + ';kind=' + kind)
         if (page > 1) xml += link('previous', feedUrl(publicPath, view, page - 1), ATOM + ';kind=' + kind)
@@ -118,7 +121,7 @@ exports.init = async api => {
                 + element('updated', item.date)
                 + (navigation
                     ? element('content', item.books ? "Download books in this folder" : "Browse this folder")
-                        + link('subsection', feedUrl(item.path, item.books ? 'books' : ''), ATOM + (item.books ? ';kind=acquisition' : ''))
+                        + link('subsection', feedUrl(item.path, item.books ? 'books' : ''), item.books ? ATOM + ';kind=acquisition' : NAVIGATION)
                     : element('content', "Download " + item.name)
                         + link('http://opds-spec.org/acquisition', absolute(item.path), MIME[item.extension]))
                 + '</entry>'

@@ -35,9 +35,9 @@ test('OPDS with real HFS routing, VFS, authentication and downloads', { timeout:
         roots: { 'public.example': '/virtual/' },
         vfs: { children: [
             { name: 'books', source: shared, masks: { 'secret.epub': { can_see: true, can_read: false }, 'hidden.epub': { can_see: false }, nested: { can_list: false } } },
-            { name: 'private', source: shared, can_see: true, can_list: ['reader'], can_read: ['reader'] },
+            { name: 'private', source: shared, can_list: ['reader'], can_read: ['reader'] },
             { name: 'forbidden', can_list: false },
-            { name: 'invisible', source: shared, can_see: false },
+            { name: 'invisible', source: shared, can_see: { this: false, children: true }, can_list: true },
             { name: 'empty' },
             { name: 'virtual', children: [{ name: 'ré & shelf', source: shared }] }
         ] }
@@ -106,7 +106,7 @@ test('OPDS with real HFS routing, VFS, authentication and downloads', { timeout:
     await t.test('empty folders and denied or invalid paths reveal no names', async () => {
         assert.equal((await catalog('/empty/?get=opds')).feed.entry, undefined)
         for (const [path, status] of [
-            ['/forbidden/', 403], ['/invisible/', 404], ['/missing/', 404], ['/books/book.pdf', 404],
+            ['/forbidden/', 403], ['/missing/', 404], ['/books/book.pdf', 404],
             ['/books/%2e%2e%2f/', 400], ['/books/%ZZ/', 404], ['/books/%5c/', 400]
         ]) {
             const response = await fetch(base + path + '?get=opds')
@@ -117,6 +117,15 @@ test('OPDS with real HFS routing, VFS, authentication and downloads', { timeout:
             assert.equal((await fetch(base + '/books/?get=opds&' + query)).status, 400)
         assert.equal((await fetch(base + '/books/?get=opds&opds_page=999')).status, 404)
         assert.equal((await fetch(base + '/books/secret.epub')).status, 403)
+    })
+
+    await t.test('hidden folders remain accessible by direct URL when HFS permits listing', async () => {
+        const normal = await fetch(base + '/~/api/get_file_list?uri=/invisible/')
+        assert.equal(normal.status, 200)
+        assert.ok((await normal.json()).list.length)
+        assert.equal((await all('/invisible/?get=opds&opds_view=books')).length, 10)
+        const root = await all('/?get=opds')
+        assert.ok(!root.some(entry => entry.title === 'invisible' || entry.title === 'private'))
     })
 
     await t.test('Basic authentication uses HFS accounts for both catalog and acquisitions', async () => {
@@ -239,6 +248,12 @@ test('OPDS with real HFS routing, VFS, authentication and downloads', { timeout:
         assert.equal(feed.author.name, 'HFS')
         assert.ok(feed.id)
         assert.ok(Number.isFinite(Date.parse(feed.updated)))
+        for (const item of [feed, ...feed.entry || []]) {
+            for (const target of item.link || []) {
+                if (target['@_type'].startsWith('application/atom+xml;profile=opds-catalog'))
+                    assert.match(target['@_type'], /;kind=(navigation|acquisition)$/, JSON.stringify(target))
+            }
+        }
         return { feed, response }
     }
 

@@ -39,8 +39,9 @@ Configure the reader with your existing HFS username and password. HFS handles H
 when its `authorization_header` setting is enabled (the default). Existing browser sessions also work.
 Use HTTPS for password authentication. Existing HFS restrictions and authentication plugins still apply;
 clients that cannot complete an extra login step may be incompatible.
-An unauthenticated request to a visible folder requiring login receives a Basic challenge.
-Folders hidden from the current account return 404; readers must send credentials preemptively for those URLs.
+An unauthenticated request to a folder requiring login receives a Basic challenge.
+Like normal HFS browsing, direct access checks the folder's listing permission;
+a folder hidden from its parent's listing can still be opened through its known URL when listing is allowed.
 Credentials and session tokens are never added to generated links.
 
 Links follow HFS's proxy-aware request scheme and host, its host-root mapping and `X-Forwarded-Prefix`.
